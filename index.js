@@ -1,11 +1,15 @@
-// index.js - PostgreSQL 저장 최종 버전
+// index.js - PostgreSQL 개별 연결 정보 사용 최종 버전
 const express = require('express');
 const { Pool } = require('pg'); // PostgreSQL 연결을 위한 라이브러리
 
-// --- PostgreSQL 연결 풀 설정 ---
-// Railway가 DATABASE_URL 환경 변수를 자동으로 주입해줍니다.
+// --- PostgreSQL 연결 설정 ---
+// Railway가 자동으로 주입해주는 개별 환경 변수를 사용합니다.
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  host: process.env.PGHOST,
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
+  port: parseInt(process.env.PGPORT, 10), // 포트 번호는 정수여야 합니다.
   ssl: {
     rejectUnauthorized: false // Railway DB 연결에 필요한 SSL 옵션
   }
@@ -38,14 +42,24 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 // --- API 엔드포인트 ---
+
+// 1. 헬스 체크 엔드포인트: 서버가 살아있는지 확인
+app.get('/', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 2. 로그 수집 엔드포인트
 app.post('/logs', async (req, res) => {
+  // body에서 주요 필드와 나머지 데이터를 분리합니다.
   const { workflowId, executionId, status, duration, ...restData } = req.body;
 
   const insertQuery = `
     INSERT INTO workflow_logs (workflow_id, execution_id, status, duration_ms, raw_data)
     VALUES ($1, $2, $3, $4, $5);
   `;
-  const values = [workflowId, executionId, status, duration, restData];
+  // duration이 없는 경우 null로 처리합니다.
+  const durationInMs = duration !== undefined ? duration : null;
+  const values = [workflowId, executionId, status, durationInMs, restData];
 
   try {
     await pool.query(insertQuery, values);
@@ -59,5 +73,6 @@ app.post('/logs', async (req, res) => {
 // --- 서버 시작 ---
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Log API server listening on port ${PORT}`);
-  createTableIfNotExists(); // 서버 시작 시 테이블 확인 및 생성
+  // 서버 시작 시 테이블이 없으면 생성
+  createTableIfNotExists();
 });
