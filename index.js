@@ -1,4 +1,4 @@
-// index.js - PostgreSQL 개별 연결 정보 사용 최종 버전
+// index.js - 모든 네트워크 인터페이스 리스닝 최종 버전
 const express = require('express');
 const { Pool } = require('pg'); // PostgreSQL 연결을 위한 라이브러리
 
@@ -50,29 +50,27 @@ app.get('/', (req, res) => {
 
 // 2. 로그 수집 엔드포인트
 app.post('/logs', async (req, res) => {
-  // body에서 주요 필드와 나머지 데이터를 분리합니다.
   const { workflowId, executionId, status, duration, ...restData } = req.body;
 
   const insertQuery = `
     INSERT INTO workflow_logs (workflow_id, execution_id, status, duration_ms, raw_data)
     VALUES ($1, $2, $3, $4, $5);
   `;
-  // duration이 없는 경우 null로 처리합니다.
   const durationInMs = duration !== undefined ? duration : null;
   const values = [workflowId, executionId, status, durationInMs, restData];
 
   try {
     await pool.query(insertQuery, values);
-    res.sendStatus(204); // 성공
+    res.sendStatus(204);
   } catch (err) {
     console.error('Error inserting log into database:', err);
-    res.sendStatus(500); // 서버 내부 오류
+    res.sendStatus(500);
   }
 });
 
 // --- 서버 시작 ---
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Log API server listening on port ${PORT}`);
-  // 서버 시작 시 테이블이 없으면 생성
+// '0.0.0.0'을 제거하여 사용 가능한 모든 인터페이스(IPv4, IPv6)에서 리스닝합니다.
+app.listen(PORT, () => {
+  console.log(`Log API server listening on all interfaces at port ${PORT}`);
   createTableIfNotExists();
 });
