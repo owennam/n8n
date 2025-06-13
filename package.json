@@ -19,6 +19,7 @@
   "homepage": "https://github.com/owennam/n8n#readme",
   "dependencies": {
     "express": "^5.1.0",
+    "pg": "^8.16.0",
     "winston": "^3.17.0"
   }
 }
